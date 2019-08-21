@@ -9,8 +9,8 @@ class ServiceContext : public RootContext {
   explicit ServiceContext(uint32_t id, StringView root_id) : RootContext(id, root_id) {}
 
   void onStart(WasmDataPtr /* vm_configuration */) override {
-    callout_success_counter_ = defineMetric(MetricType::Counter, "test_callout_successes");
-    callout_failure_counter_ = defineMetric(MetricType::Counter, "test_callout_failures");
+    CHECK_RESULT(defineMetric(MetricType::Counter, "test_callout_successes", &callout_success_counter_));
+    CHECK_RESULT(defineMetric(MetricType::Counter, "test_callout_failures", &callout_failure_counter_));
   }
 
   void incrementCalloutSuccesses(uint32_t inc_amount = 1U) {
@@ -52,16 +52,16 @@ class CalloutResponseHandler : public GrpcCallHandler<google::protobuf::Value> {
 
     continueRequest();
   }
+
   void onFailure(GrpcStatus status,
                  std::unique_ptr<WasmData> error_message) override {
     request_context_->setEffectiveContext();
     logInfo(std::string("failure ") + std::to_string(static_cast<int>(status)) +
-            std::string(error_message->view()));
+            " " + std::string(error_message->view()));
 
     service_context_->incrementCalloutFailures();
 
-    // TODO wasm engine must support fail closed: expose abortRequest() or similar
-    continueRequest();
+    sendLocalResponse(502, error_message->view(), "", {}, status);
   }
 
  private:

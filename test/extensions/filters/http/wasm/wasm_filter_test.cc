@@ -83,7 +83,8 @@ public:
     scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("wasm."));
     wasm_ = Extensions::Common::Wasm::createWasmForTesting(
         proto_config.vm_id(), proto_config.vm_config(), proto_config.root_id(), cluster_manager_,
-        dispatcher_, *api, *scope_, local_info_, &listener_metadata_, nullptr,
+        dispatcher_, *api, *scope_, Envoy::Extensions::Common::Wasm::PluginDirection::Inbound,
+        local_info_, &listener_metadata_, nullptr,
         std::unique_ptr<Envoy::Extensions::Common::Wasm::Context>(root_context_));
   }
 
@@ -97,7 +98,8 @@ public:
     scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("wasm."));
     wasm_ = Extensions::Common::Wasm::createWasmForTesting(
         proto_config.vm_id(), proto_config.vm_config(), proto_config.root_id(), cluster_manager_,
-        dispatcher_, *api, *scope_, local_info_, &listener_metadata_, nullptr,
+        dispatcher_, *api, *scope_, Envoy::Extensions::Common::Wasm::PluginDirection::Inbound,
+        local_info_, &listener_metadata_, nullptr,
         std::unique_ptr<Envoy::Extensions::Common::Wasm::Context>(root_context_));
   }
 
@@ -369,7 +371,7 @@ TEST_P(WasmHttpFilterTest, SharedData) {
   setupConfig(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/shared_cpp.wasm")));
   setupFilter();
-  EXPECT_CALL(*filter_, scriptLog_(spdlog::level::info, Eq(absl::string_view("set 1 1 0"))));
+  EXPECT_CALL(*filter_, scriptLog_(spdlog::level::info, Eq(absl::string_view("set CasMismatch"))));
   EXPECT_CALL(*filter_,
               scriptLog_(spdlog::level::debug, Eq(absl::string_view("get 1 shared_data_value1"))));
   EXPECT_CALL(*filter_,
@@ -385,12 +387,12 @@ TEST_P(WasmHttpFilterTest, SharedQueue) {
   setupConfig(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/queue_cpp.wasm")));
   setupFilter();
-  EXPECT_CALL(*filter_,
-              scriptLog_(spdlog::level::warn, Eq(absl::string_view("onRequestHeaders 1"))));
+  EXPECT_CALL(*filter_, scriptLog_(spdlog::level::warn,
+                                   Eq(absl::string_view("onRequestHeaders enqueue Ok"))));
   EXPECT_CALL(*root_context_,
               scriptLog_(spdlog::level::info, Eq(absl::string_view("onQueueReady"))));
   EXPECT_CALL(*root_context_,
-              scriptLog_(spdlog::level::debug, Eq(absl::string_view("data data1 1"))));
+              scriptLog_(spdlog::level::debug, Eq(absl::string_view("data data1 Ok"))));
 
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(Return());
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
